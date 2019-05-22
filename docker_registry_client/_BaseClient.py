@@ -1,5 +1,5 @@
 import logging
-from requests import get, put, delete
+from requests import get, put, delete, utils
 from requests.exceptions import HTTPError
 import json
 from .AuthorizationService import AuthorizationService
@@ -173,7 +173,19 @@ class BaseClientV2(CommonBaseClient):
 
     def catalog(self):
         self.auth.desired_scope = 'registry:catalog:*'
-        return self._http_call('/v2/_catalog', get)
+        data = {'repositories': []}
+        url = '/v2/_catalog'
+        while True:
+            response = self._http_response(url, get)
+            content = response.json()
+            if content:
+                data['repositories'].extend(content[r'repositories'])
+            if 'Link' in response.headers:
+                Link = utils.parse_header_links(response.headers['Link'])
+                url = Link[0]['url']
+            else:
+                break
+        return data
 
     def get_repository_tags(self, name):
         self.auth.desired_scope = 'repository:%s:*' % name
